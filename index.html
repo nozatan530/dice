@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2つのサイコロ｜出目と和の分布</title>
+<meta property="og:title" content="2つのサイコロ">
+<meta property="og:description" content="2つのサイコロの出目と和の分布を視覚的に確認できるインタラクティブツール">
+<meta property="og:image" content="https://dice.meetupsensei.com/ogp.jpg">
+<meta property="og:url" content="https://dice.meetupsensei.com/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Outfit:wght@600;800&display=swap');
+
+  :root {
+    --bg: #1a1330;
+    --panel: #251a46;
+    --panel-light: #322359;
+    --accent: #ffb347;
+    --accent2: #ffd166;
+    --dieA: #ff7eb6;
+    --dieB: #6bc1ff;
+    --sum: #b388ff;
+    --theory: #ffd166;
+    --text: #f3edff;
+    --muted: #a89cc8;
+    --line: #3d2c6e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: radial-gradient(ellipse at top, #2a1e54 0%, #1a1330 60%);
+    color: var(--text); min-height: 100vh; padding: 18px; line-height: 1.55;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+  h1 { font-family: 'Outfit', sans-serif; font-size: 1.7rem; text-align: center; color: var(--accent2); margin-bottom: 2px; }
+  .subtitle { text-align: center; color: var(--muted); font-size: 0.85rem; margin-bottom: 18px; }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { font-size: 0.95rem; margin-bottom: 12px; color: var(--accent2); }
+
+  /* サイコロ表示 */
+  .dice-row { display: flex; gap: 24px; justify-content: center; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .die-box { text-align: center; }
+  .die-label { font-size: 0.82rem; color: var(--muted); margin-bottom: 6px; }
+  .die {
+    width: 90px; height: 90px; background: #fff; border-radius: 16px;
+    display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+    padding: 12px; gap: 4px; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    margin: 0 auto;
+  }
+  .die.A { box-shadow: 0 4px 24px rgba(255,126,182,0.5); }
+  .die.B { box-shadow: 0 4px 24px rgba(107,193,255,0.5); }
+  .pip { background: #1a1330; border-radius: 50%; visibility: hidden; }
+  .pip.on { visibility: visible; }
+  .plus-sign { font-family: 'Outfit'; font-size: 2.4rem; color: var(--muted); align-self: center; }
+  .sum-display { text-align: center; }
+  .sum-display .num { font-family: 'Outfit'; font-size: 3rem; color: var(--sum); line-height: 1; }
+  .sum-display .lbl { font-size: 0.8rem; color: var(--muted); }
+
+  /* ボタン */
+  .btn-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    padding: 12px 18px; border: none; border-radius: 12px;
+    font-weight: 700; font-size: 0.9rem; cursor: pointer; font-family: inherit;
+    transition: transform 0.1s, box-shadow 0.2s;
+  }
+  .btn-1 { background: linear-gradient(135deg, var(--dieA), #d65a99); color: #2a0f1c; }
+  .btn-10 { background: linear-gradient(135deg, var(--dieB), #4d96d4); color: #001f33; }
+  .btn-100 { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #3a2200; }
+  .btn-1000 { background: linear-gradient(135deg, var(--sum), #8e6ad8); color: #1a0a3a; }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.3); }
+  .btn:active { transform: translateY(1px); }
+  .reset-btn { padding: 10px 16px; background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 10px; cursor: pointer; font-family: inherit; font-size: 0.82rem; }
+  .reset-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .total { text-align: center; margin-top: 12px; font-size: 0.86rem; color: var(--muted); }
+  .total .num { font-family: 'Outfit'; color: var(--accent2); font-size: 1.2rem; }
+
+  /* 分布チャート */
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px) { .charts { grid-template-columns: 1fr; } }
+  .chart-card { background: var(--panel-light); border-radius: 12px; padding: 14px; }
+  .chart-card h3 { font-size: 0.86rem; margin-bottom: 10px; }
+  .chart-card.A h3 { color: var(--dieA); }
+  .chart-card.B h3 { color: var(--dieB); }
+  .chart-card.sum h3 { color: var(--sum); }
+  canvas { width: 100%; height: auto; display: block; }
+  .chart-note { font-size: 0.74rem; color: var(--muted); margin-top: 6px; text-align: center; }
+
+  .insight { background: linear-gradient(135deg, rgba(255,209,102,0.1), rgba(255,209,102,0.02)); border: 1px solid rgba(255,209,102,0.3); border-radius: 10px; padding: 12px; margin-top: 14px; font-size: 0.83rem; }
+  .insight b { color: var(--accent2); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎲 2つのサイコロを振ろう</h1>
+  <p class="subtitle">それぞれの目の分布と、和の分布はどう違う？</p>
+
+  <div class="card">
+    <h2>🎯 直近の出目</h2>
+    <div class="dice-row">
+      <div class="die-box">
+        <div class="die-label" style="color:var(--dieA)">サイコロA</div>
+        <div class="die A" id="dieA"></div>
+      </div>
+      <div class="plus-sign">＋</div>
+      <div class="die-box">
+        <div class="die-label" style="color:var(--dieB)">サイコロB</div>
+        <div class="die B" id="dieB"></div>
+      </div>
+      <div class="plus-sign">＝</div>
+      <div class="sum-display">
+        <div class="num" id="sumDisplay">—</div>
+        <div class="lbl">和</div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-1" onclick="roll(1)">1回振る</button>
+      <button class="btn btn-10" onclick="roll(10)">10回振る</button>
+      <button class="btn btn-100" onclick="roll(100)">100回振る</button>
+      <button class="btn btn-1000" onclick="roll(1000)">1000回振る</button>
+      <button class="reset-btn" onclick="resetAll()">↺ リセット</button>
+    </div>
+
+    <div class="total">これまで振った回数：<span class="num" id="totalRolls">0</span></div>
+  </div>
+
+  <div class="charts">
+    <div class="chart-card A">
+      <h3>🎲 サイコロA の分布</h3>
+      <canvas id="chartA" width="360" height="240"></canvas>
+      <div class="chart-note">各目の理論確率は 1/6 ≒ 16.67%（黄色い線）</div>
+    </div>
+    <div class="chart-card B">
+      <h3>🎲 サイコロB の分布</h3>
+      <canvas id="chartB" width="360" height="240"></canvas>
+      <div class="chart-note">各目の理論確率は 1/6 ≒ 16.67%（黄色い線）</div>
+    </div>
+  </div>
+
+  <div class="chart-card sum" style="margin-top:14px">
+    <h3>➕ 2つの目の和（2〜12）の分布</h3>
+    <canvas id="chartSum" width="780" height="280"></canvas>
+    <div class="chart-note">黄色い線は理論確率（和が7のとき最大：6/36 ≒ 16.67%）</div>
+  </div>
+
+  <div class="insight">
+    <b>気づこう：</b>サイコロA・Bは1〜6が等しく出る（一様分布）はずなのに、和は7が一番出やすく、両端の2や12は珍しい。
+    これは、和が7になる組み合わせ（1+6, 2+5, 3+4, 4+3, 5+2, 6+1）が6通りもあるのに対し、和が2になる組み合わせは1+1の1通りしかないから。
+    たくさん振るほど、それぞれの分布は理論値に近づきます。
+  </div>
+</div>
+
+<script>
+  // ===== サイコロのドット配置（位置 1=左上 ... 9=右下） =====
+  const PIP_PATTERN = {
+    1: [5],
+    2: [3, 7],
+    3: [3, 5, 7],
+    4: [1, 3, 7, 9],
+    5: [1, 3, 5, 7, 9],
+    6: [1, 3, 4, 6, 7, 9]
+  };
+
+  // 各サイコロの表示エリアにpipを並べる
+  function initDie(id) {
+    const el = document.getElementById(id);
+    el.innerHTML = '';
+    for (let i=1;i<=9;i++){
+      const pip = document.createElement('div');
+      pip.className = 'pip';
+      pip.dataset.pos = i;
+      el.appendChild(pip);
+    }
+  }
+  function showDie(id, value) {
+    const el = document.getElementById(id);
+    const positions = PIP_PATTERN[value] || [];
+    el.querySelectorAll('.pip').forEach(pip => {
+      pip.classList.toggle('on', positions.includes(+pip.dataset.pos));
+    });
+  }
+
+  // ===== カウント =====
+  let countA = [0,0,0,0,0,0,0]; // index 1〜6
+  let countB = [0,0,0,0,0,0,0];
+  let countSum = new Array(13).fill(0); // index 2〜12
+  let totalRolls = 0;
+
+  function roll(times) {
+    let lastA = 0, lastB = 0;
+    for (let i=0;i<times;i++){
+      const a = Math.floor(Math.random()*6) + 1;
+      const b = Math.floor(Math.random()*6) + 1;
+      countA[a]++; countB[b]++; countSum[a+b]++;
+      lastA = a; lastB = b;
+    }
+    totalRolls += times;
+    // 直近の出目を表示
+    showDie('dieA', lastA);
+    showDie('dieB', lastB);
+    document.getElementById('sumDisplay').textContent = lastA + lastB;
+    document.getElementById('totalRolls').textContent = totalRolls.toLocaleString();
+    drawAll();
+  }
+
+  function resetAll() {
+    countA = [0,0,0,0,0,0,0];
+    countB = [0,0,0,0,0,0,0];
+    countSum = new Array(13).fill(0);
+    totalRolls = 0;
+    document.getElementById('totalRolls').textContent = '0';
+    document.getElementById('sumDisplay').textContent = '—';
+    // ダイスを空に
+    document.querySelectorAll('.pip').forEach(p => p.classList.remove('on'));
+    drawAll();
+  }
+
+  // ===== ヒストグラム描画（一様分布用：1〜6）=====
+  function drawDieChart(canvasId, counts, color) {
+    const cv = document.getElementById(canvasId);
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    const padL = 36, padR = 12, padT = 16, padB = 32;
+    ctx.clearRect(0,0,W,H);
+
+    const labels = [1,2,3,4,5,6];
+    const total = counts.slice(1).reduce((a,b)=>a+b, 0);
+    const probs = labels.map(i => total>0 ? counts[i]/total : 0);
+
+    // y軸は確率（0〜0.35くらい）
+    const yMax = 0.35;
+    const yPix = p => H - padB - (p/yMax)*(H - padT - padB);
+
+    // y軸グリッド
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+    for (let i=0; i<=3; i++){
+      const yv = i * (yMax/3);
+      const y = yPix(yv);
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W-padR, y); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = '10px Outfit'; ctx.textAlign = 'right';
+      ctx.fillText((yv*100).toFixed(0)+'%', padL-4, y+3);
+    }
+
+    // バー
+    const barCount = labels.length;
+    const slotW = (W - padL - padR) / barCount;
+    const barW = slotW * 0.7;
+    labels.forEach((lbl, i) => {
+      const cx = padL + slotW*(i+0.5);
+      const y = yPix(probs[i]);
+      ctx.fillStyle = color;
+      ctx.fillRect(cx - barW/2, y, barW, H - padB - y);
+      // ラベル
+      ctx.fillStyle = '#a89cc8'; ctx.font = '12px Noto Sans JP'; ctx.textAlign = 'center';
+      ctx.fillText(lbl, cx, H - padB + 14);
+      // 数値（小さく）
+      if (probs[i] > 0) {
+        ctx.fillStyle = '#fff'; ctx.font = '10px Outfit';
+        ctx.fillText((probs[i]*100).toFixed(1)+'%', cx, y - 4);
+      }
+    });
+
+    // 理論線（1/6 ≒ 16.67%）
+    const theoryY = yPix(1/6);
+    ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2; ctx.setLineDash([5,4]);
+    ctx.beginPath(); ctx.moveTo(padL, theoryY); ctx.lineTo(W-padR, theoryY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#ffd166'; ctx.font = 'bold 10px Outfit'; ctx.textAlign = 'left';
+    ctx.fillText('1/6', W-padR-26, theoryY-4);
+  }
+
+  // ===== 和の分布（2〜12、三角形）=====
+  function drawSumChart() {
+    const cv = document.getElementById('chartSum');
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    const padL = 44, padR = 16, padT = 24, padB = 36;
+    ctx.clearRect(0,0,W,H);
+
+    const labels = [2,3,4,5,6,7,8,9,10,11,12];
+    const total = countSum.reduce((a,b)=>a+b, 0);
+    const probs = labels.map(s => total>0 ? countSum[s]/total : 0);
+
+    // 理論確率：(7-|s-7|)/36
+    const theoryProbs = labels.map(s => (7 - Math.abs(s-7))/36);
+
+    const yMax = 0.22;
+    const yPix = p => H - padB - (p/yMax)*(H - padT - padB);
+
+    // グリッド
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+    for (let i=0; i<=4; i++){
+      const yv = i * (yMax/4);
+      const y = yPix(yv);
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W-padR, y); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = '10px Outfit'; ctx.textAlign = 'right';
+      ctx.fillText((yv*100).toFixed(0)+'%', padL-4, y+3);
+    }
+
+    // バー
+    const slotW = (W - padL - padR) / labels.length;
+    const barW = slotW * 0.72;
+    labels.forEach((s, i) => {
+      const cx = padL + slotW*(i+0.5);
+      const y = yPix(probs[i]);
+      ctx.fillStyle = 'rgba(179,136,255,0.85)';
+      ctx.fillRect(cx - barW/2, y, barW, H - padB - y);
+      // ラベル
+      ctx.fillStyle = '#a89cc8'; ctx.font = '12px Noto Sans JP'; ctx.textAlign = 'center';
+      ctx.fillText(s, cx, H - padB + 14);
+      // 実測%
+      if (probs[i] > 0) {
+        ctx.fillStyle = '#fff'; ctx.font = '10px Outfit';
+        ctx.fillText((probs[i]*100).toFixed(1)+'%', cx, y - 4);
+      }
+    });
+
+    // 理論線（折れ線）
+    ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    labels.forEach((s, i) => {
+      const cx = padL + slotW*(i+0.5);
+      const y = yPix(theoryProbs[i]);
+      if (i === 0) ctx.moveTo(cx, y); else ctx.lineTo(cx, y);
+    });
+    ctx.stroke();
+    // 理論点
+    labels.forEach((s, i) => {
+      const cx = padL + slotW*(i+0.5);
+      const y = yPix(theoryProbs[i]);
+      ctx.fillStyle = '#ffd166';
+      ctx.beginPath(); ctx.arc(cx, y, 3, 0, Math.PI*2); ctx.fill();
+    });
+
+    // 凡例
+    ctx.fillStyle = '#ffd166'; ctx.font = 'bold 11px Noto Sans JP'; ctx.textAlign = 'right';
+    ctx.fillText('— 理論確率', W-padR-4, padT-8);
+  }
+
+  function drawAll() {
+    drawDieChart('chartA', countA, 'rgba(255,126,182,0.85)');
+    drawDieChart('chartB', countB, 'rgba(107,193,255,0.85)');
+    drawSumChart();
+  }
+
+  // 初期化
+  initDie('dieA');
+  initDie('dieB');
+  drawAll();
+</script>
+</body>
+</html>
